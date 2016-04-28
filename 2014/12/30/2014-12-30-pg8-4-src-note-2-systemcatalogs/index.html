@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>PostgreSQL笔记2——系统表 | Hexo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="如果看过随便哪本数据库的教科书——无论是数据库系统概念还是数据库系统实现——都知道：数据库，大概来说，主要就是分为3个模块：存储管理，查询处理和事务处理。其它的部分或者模块都是围绕这3个模块的。
+按照PostgreSQL数据库内核分析这本书的说法，PG主要由5大模块构成，除了上述3个之外，就是连接管理和系统表。这一节咱们来看看系统表，我在项目开始的时候，也是对这个玩意儿最感兴趣。
+本质上来说，所谓">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PostgreSQL笔记2——系统表">
+<meta property="og:url" content="http://yoursite.com/2014/12/30/2014-12-30-pg8-4-src-note-2-systemcatalogs/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="如果看过随便哪本数据库的教科书——无论是数据库系统概念还是数据库系统实现——都知道：数据库，大概来说，主要就是分为3个模块：存储管理，查询处理和事务处理。其它的部分或者模块都是围绕这3个模块的。
+按照PostgreSQL数据库内核分析这本书的说法，PG主要由5大模块构成，除了上述3个之外，就是连接管理和系统表。这一节咱们来看看系统表，我在项目开始的时候，也是对这个玩意儿最感兴趣。
+本质上来说，所谓">
+<meta property="og:updated_time" content="2014-12-30T05:15:07.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="PostgreSQL笔记2——系统表">
+<meta name="twitter:description" content="如果看过随便哪本数据库的教科书——无论是数据库系统概念还是数据库系统实现——都知道：数据库，大概来说，主要就是分为3个模块：存储管理，查询处理和事务处理。其它的部分或者模块都是围绕这3个模块的。
+按照PostgreSQL数据库内核分析这本书的说法，PG主要由5大模块构成，除了上述3个之外，就是连接管理和系统表。这一节咱们来看看系统表，我在项目开始的时候，也是对这个玩意儿最感兴趣。
+本质上来说，所谓">
+  
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+
+</head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Hexo</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-2014-12-30-pg8-4-src-note-2-systemcatalogs" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2014/12/30/2014-12-30-pg8-4-src-note-2-systemcatalogs/" class="article-date">
+  <time datetime="2014-12-30T05:14:10.000Z" itemprop="datePublished">2014-12-30</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/database/">database</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      PostgreSQL笔记2——系统表
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>如果看过随便哪本数据库的教科书——无论是数据库系统概念还是数据库系统实现——都知道：数据库，大概来说，主要就是分为3个模块：存储管理，查询处理和事务处理。其它的部分或者模块都是围绕这3个模块的。</p>
+<p>按照PostgreSQL数据库内核分析这本书的说法，PG主要由5大模块构成，除了上述3个之外，就是连接管理和系统表。这一节咱们来看看系统表，我在项目开始的时候，也是对这个玩意儿最感兴趣。</p>
+<p>本质上来说，所谓的系统表(System Catalogs)，也就是数据字典，元数据。<br>数据字典是关系型数据库系统管理控制信息的核心，它描述了所有对象及其属性的描述信息，对象之间关系的描述信息，对象属性的自然语言含义以及数据字典变化的历史。这种系统表，既有针对数据库的，也有各数据库之间公用的；同时考虑到性能，这些系统表很自然的应该是常驻内存的cache中；大多数系统表是在数据库创建过程中从模板数据库拷贝过来的。</p>
+<p>PG中系统表的实现就在<br><code>src/include/catalog/pg_xxx.h</code><br><code>src/backend/catalog/pg_xxx.c</code></p>
+<p>具体的系统表的概念我就不多说了，可以参考你手头pg版本所对应的internal手册，一般在internal的第2章，例如<a href="http://www.postgresql.org/docs/9.3/static/internals.html" target="_blank" rel="external">9.3的文档部分</a></p>
+<h1 id="TODO"><a href="#TODO" class="headerlink" title="TODO"></a>TODO</h1><p>link<br>pic<br>pg</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2014/12/30/2014-12-30-pg8-4-src-note-2-systemcatalogs/" data-id="cinkhjqcw00007ycke39a313p" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/codereading/">codereading</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/pg/">pg</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2014/12/30/2014-12-30-pg8-4-src-note-3-processes/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          PostgreSQL笔记3——进程结构
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2014/12/30/2014-12-30-pg8-4-src-note-1-getsource/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">PostgreSQL笔记1——获取代码</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/database/">database</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/codereading/">codereading</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/pg/">pg</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/codereading/" style="font-size: 10px;">codereading</a> <a href="/tags/pg/" style="font-size: 10px;">pg</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/04/">April 2016</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/12/">December 2014</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2016/04/29/hello-world/">Hello World</a>
+          </li>
+        
+          <li>
+            <a href="/2014/12/30/2014-12-30-pg8-4-src-note-3-processes/">PostgreSQL笔记3——进程结构</a>
+          </li>
+        
+          <li>
+            <a href="/2014/12/30/2014-12-30-pg8-4-src-note-2-systemcatalogs/">PostgreSQL笔记2——系统表</a>
+          </li>
+        
+          <li>
+            <a href="/2014/12/30/2014-12-30-pg8-4-src-note-1-getsource/">PostgreSQL笔记1——获取代码</a>
+          </li>
+        
+          <li>
+            <a href="/2014/12/07/first-blog-of-hexo-on-github/">first blog of hexo on github</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2016 John Doe<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+  </div>
+</body>
+</html>

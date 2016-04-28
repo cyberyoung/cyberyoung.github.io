@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>PostgreSQL笔记3——进程结构 | Hexo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="OID概念PG内部统一的标示符，可以关注
+oid@pg_database, oid@pg_class
+initdb：创建数据集簇创建包含数据库系统所有数据的数据目录，共享的数据表，其它的配置文件和控制文件，3个数据库：template1, template0, postgres（以后创建的数据库都会从template1拷贝内容）
+具体数据库
+PGDATA/base都有以其OID命名的子目录；
+每个">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PostgreSQL笔记3——进程结构">
+<meta property="og:url" content="http://yoursite.com/2014/12/30/2014-12-30-pg8-4-src-note-3-processes/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="OID概念PG内部统一的标示符，可以关注
+oid@pg_database, oid@pg_class
+initdb：创建数据集簇创建包含数据库系统所有数据的数据目录，共享的数据表，其它的配置文件和控制文件，3个数据库：template1, template0, postgres（以后创建的数据库都会从template1拷贝内容）
+具体数据库
+PGDATA/base都有以其OID命名的子目录；
+每个">
+<meta property="og:updated_time" content="2016-01-19T02:22:43.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="PostgreSQL笔记3——进程结构">
+<meta name="twitter:description" content="OID概念PG内部统一的标示符，可以关注
+oid@pg_database, oid@pg_class
+initdb：创建数据集簇创建包含数据库系统所有数据的数据目录，共享的数据表，其它的配置文件和控制文件，3个数据库：template1, template0, postgres（以后创建的数据库都会从template1拷贝内容）
+具体数据库
+PGDATA/base都有以其OID命名的子目录；
+每个">
+  
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+
+</head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Hexo</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-2014-12-30-pg8-4-src-note-3-processes" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2014/12/30/2014-12-30-pg8-4-src-note-3-processes/" class="article-date">
+  <time datetime="2014-12-30T05:16:07.000Z" itemprop="datePublished">2014-12-30</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/database/">database</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      PostgreSQL笔记3——进程结构
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h1 id="OID概念"><a href="#OID概念" class="headerlink" title="OID概念"></a>OID概念</h1><p>PG内部统一的标示符，可以关注</p>
+<pre><code>oid@pg_database, oid@pg_class
+</code></pre><h1 id="initdb：创建数据集簇"><a href="#initdb：创建数据集簇" class="headerlink" title="initdb：创建数据集簇"></a>initdb：创建数据集簇</h1><p>创建包含数据库系统所有数据的数据目录，共享的数据表，其它的配置文件和控制文件，3个数据库：template1, template0, postgres（以后创建的数据库都会从template1拷贝内容）</p>
+<h2 id="具体数据库"><a href="#具体数据库" class="headerlink" title="具体数据库"></a>具体数据库</h2><ul>
+<li>PGDATA/base都有以其OID命名的子目录；</li>
+<li>每个表和索引都在其下面，命名为filenode号(relfilenode@pg_class)；</li>
+<li>表和索引文件超过1G大小的策略，filenode.1…., reltoastrelid@pg_class</li>
+<li>PG_DATA中的子目录和文件</li>
+</ul>
+<h2 id="initdb-gt-postgres-gt-bootstrap-postgres-bki"><a href="#initdb-gt-postgres-gt-bootstrap-postgres-bki" class="headerlink" title="initdb -&gt; postgres &gt; bootstrap(postgres.bki)"></a>initdb -&gt; postgres &gt; bootstrap(postgres.bki)</h2><pre><code>BKI命令
+initdb过程
+</code></pre><h1 id="postgresql进程结构"><a href="#postgresql进程结构" class="headerlink" title="postgresql进程结构"></a>postgresql进程结构</h1><pre><code>守护进程PostMaster
+服务进程Postgres
+辅助进程SysLogger, PgStat, AutoVacuum,     BgWriter, WalWriter, PgArch
+</code></pre><h2 id="postmaster"><a href="#postmaster" class="headerlink" title="postmaster"></a>postmaster</h2><pre><code>memorycontext
+configuration
+listen
+signal
+</code></pre>
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2014/12/30/2014-12-30-pg8-4-src-note-3-processes/" data-id="cinkhjqda00047yck1a5ai3k2" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/codereading/">codereading</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/pg/">pg</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2016/04/29/hello-world/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          Hello World
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2014/12/30/2014-12-30-pg8-4-src-note-2-systemcatalogs/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">PostgreSQL笔记2——系统表</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/database/">database</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/codereading/">codereading</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/pg/">pg</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/codereading/" style="font-size: 10px;">codereading</a> <a href="/tags/pg/" style="font-size: 10px;">pg</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/04/">April 2016</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2014/12/">December 2014</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2016/04/29/hello-world/">Hello World</a>
+          </li>
+        
+          <li>
+            <a href="/2014/12/30/2014-12-30-pg8-4-src-note-3-processes/">PostgreSQL笔记3——进程结构</a>
+          </li>
+        
+          <li>
+            <a href="/2014/12/30/2014-12-30-pg8-4-src-note-2-systemcatalogs/">PostgreSQL笔记2——系统表</a>
+          </li>
+        
+          <li>
+            <a href="/2014/12/30/2014-12-30-pg8-4-src-note-1-getsource/">PostgreSQL笔记1——获取代码</a>
+          </li>
+        
+          <li>
+            <a href="/2014/12/07/first-blog-of-hexo-on-github/">first blog of hexo on github</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2016 John Doe<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+  </div>
+</body>
+</html>
